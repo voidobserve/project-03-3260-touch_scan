@@ -1,0 +1,130 @@
+C51 COMPILER V9.60.7.0   UART0                                                             11/20/2024 17:46:08 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE UART0
+OBJECT MODULE PLACED IN .\Release\Objects\uart0.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\Hardware\uart0.c LARGE OPTIMIZE(8,SIZE) BROWSE INTVECTOR(0X000C) I
+                    -NCDIR(..\..\Libraries\Include;..\..\User;..\..\User\lib;..\..\Hardware) INTERVAL(3) DEBUG OBJECTEXTEND PRINT(.\Release\L
+                    -istings\uart0.lst) OBJECT(.\Release\Objects\uart0.obj)
+
+line level    source
+
+   1          #include "uart0.h"
+   2          
+   3          #include <string.h> // memset()
+   4          
+   5          // 设置的波特率需要适配单片机的时钟，这里直接使用了官方的代码
+   6          #define USER_UART0_BAUD ((SYSCLK - UART0_BAUDRATE) / (UART0_BAUDRATE))
+   7          
+   8          // 用来存放接收的数据帧的缓冲区
+   9          volatile u8 uart0_recv_buf[(UART0_RXBUF_LEN) / (FRAME_MAX_LEN)][FRAME_MAX_LEN] = {0};
+  10          // 用于记录接收缓冲区的对应的数据帧的长度
+  11          volatile u8 uart0_recv_len[(UART0_RXBUF_LEN) / (FRAME_MAX_LEN)] = {0};
+  12          // 记录缓冲区中对应的位置是否有数据的标志位（数组）
+  13          // 例如，缓冲区下标0的位置有指令，标志位数组下标0的元素值为1，没有指令，�
+             -��素的值为0
+  14          volatile u8 recved_flagbuf[(UART0_RXBUF_LEN) / (FRAME_MAX_LEN)] = {0};
+  15          
+  16          volatile u8 flagbuf_valid_instruction[(UART0_RXBUF_LEN) / (FRAME_MAX_LEN)] = {0}; // 存放有合法指令
+             -的标志位数组
+  17          
+  18          // 串口中断服务函数中，接收一帧的标志位，0--准备接收一帧的第一个字节，1--�
+             -��在接收该帧的数据
+  19          static volatile bit flag_is_recving_data = 0;
+  20          static volatile u8 frame_len = 0;    // 记录串口中断服务函数中，当前要接收的数据帧的
+             -字节数
+  21          static volatile u8 cur_recv_len = 0; // 记录串口中断服务函数中，当前已接收的数据帧的
+             -字节数
+  22          volatile u8 recv_frame_cnt = 0;      // 接收到的数据帧的个数
+  23          
+  24          static volatile u32 blank_index = 0; // 记录当前存放数据帧的缓冲区的空的地方(缓冲区�
+             -�标)，准备存放一帧的数据
+  25          
+  26          // bit test_bit = 0; // 测试用
+  27          
+  28          // u32 test_val = 0; // 测试用
+  29          
+  30          // 重写putchar()函数
+  31          char putchar(char c)
+  32          {
+  33   1          uart0_sendbyte(c);
+  34   1          return c;
+  35   1      }
+  36          
+  37          // uart0初始化
+  38          // 波特率由宏 UART0_BAUDRATE 来决定
+  39          void uart0_config(void)
+  40          {
+  41   1          // 电路板上，P11为发送引脚，P12为接收引脚
+  42   1          P1_MD0 &= (~GPIO_P11_MODE_SEL(0x3) | ~GPIO_P12_MODE_SEL(0x3));
+  43   1          P1_MD0 |= GPIO_P11_MODE_SEL(0x1); // 输出模式
+  44   1          FOUT_S11 |= GPIO_FOUT_UART0_TX;   // 配置P11为UART0_TX
+  45   1          FIN_S7 |= GPIO_FIN_SEL_P12;       // 配置P12为UART0_RX
+  46   1      
+  47   1          __EnableIRQ(UART0_IRQn); // 打开UART模块中断
+C51 COMPILER V9.60.7.0   UART0                                                             11/20/2024 17:46:08 PAGE 2   
+
+  48   1          IE_EA = 1;               // 打开总中断
+  49   1      
+  50   1          UART0_BAUD1 = (USER_UART0_BAUD >> 8) & 0xFF; // 配置波特率高八位
+  51   1          UART0_BAUD0 = USER_UART0_BAUD & 0xFF;        // 配置波特率低八位
+  52   1          UART0_CON0 = UART_STOP_BIT(0x0) |
+  53   1                       UART_RX_IRQ_EN(0x1) |
+  54   1                       UART_EN(0x1); // 8bit数据，1bit停止位，使能RX中断
+  55   1      
+  56   1          // memset(uart0_recv_buf, 0, sizeof(uart0_recv_buf));
+  57   1      }
+  58          
+  59          // UART0中断服务函数（接收中断）
+  60          void UART0_IRQHandler(void) interrupt UART0_IRQn
+  61          {
+  62   1          volatile u8 uart0_tmp_val = 0;
+  63   1      
+  64   1          // 进入中断设置IP，不可删除
+  65   1          __IRQnIPnPush(UART0_IRQn);
+  66   1          // ---------------- 用户函数处理 -------------------
+  67   1          // RX接收完成中断
+  68   1          if (UART0_STA & UART_RX_DONE(0x1))
+  69   1          {
+  70   2              
+  71   2          } // if (UART0_STA & UART_RX_DONE(0x1))
+  72   1      
+  73   1          // 退出中断设置IP，不可删除
+  74   1          __IRQnIPnPop(UART0_IRQn);
+  75   1      }
+  76          
+  77          // UART0发送一个字节数据的函数
+  78          void uart0_sendbyte(u8 senddata)
+  79          {
+  80   1          while (!(UART0_STA & UART_TX_DONE(0x01)))
+  81   1              ;
+  82   1          UART0_DATA = senddata;
+  83   1          while (!(UART0_STA & UART_TX_DONE(0x01))) // 等待这次发送完成
+  84   1              ;
+  85   1      }
+  86          
+  87          // 通过uart0发送若干数据
+  88          void uart0_send_buff(u8 *buf, u8 len)
+  89          {
+  90   1          u8 i = 0;
+  91   1          for (; i < len; i++)
+  92   1          {
+  93   2              uart0_sendbyte(buf[i]);
+  94   2          }
+  95   1      }
+  96          
+  97          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    117    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     46       5
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

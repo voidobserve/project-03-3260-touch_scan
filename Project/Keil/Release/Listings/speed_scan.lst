@@ -1,0 +1,137 @@
+C51 COMPILER V9.60.7.0   SPEED_SCAN                                                        11/20/2024 15:06:13 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE SPEED_SCAN
+OBJECT MODULE PLACED IN .\Release\Objects\speed_scan.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\User\speed_scan.c LARGE OPTIMIZE(8,SIZE) BROWSE INTVECTOR(0X000C) 
+                    -INCDIR(..\..\Libraries\Include;..\..\User;..\..\User\lib;..\..\Hardware) INTERVAL(3) DEBUG OBJECTEXTEND PRINT(.\Release\
+                    -Listings\speed_scan.lst) OBJECT(.\Release\Objects\speed_scan.obj)
+
+line level    source
+
+   1          #include "speed_scan.h"
+   2          
+   3          // 多少个脉冲表示一圈
+   4          #ifndef PULSE_PER_TURN
+   5          #define PULSE_PER_TURN (16)
+   6          #endif // 多少个脉冲表示一圈
+   7          
+   8          // 车轮一圈表示多少毫米
+   9          #ifndef MM_PER_TURN
+  10          #define MM_PER_TURN (1795) // 一圈1795毫米
+  11          #endif                   // 车轮一圈表示多少毫米
+  12          
+  13          static volatile u32 detect_speed_pulse_cnt = 0; // 脉冲计数值
+  14          volatile u32 distance = 0;         // 存放每次扫描时走过的路程（单位：毫米）-->用于�
+             -�程表的计数
+  15          
+  16          // 时速扫描的配置
+  17          void speed_scan_config(void)
+  18          {
+  19   1          // 使用IO中断来对脉冲计数
+  20   1          __SetIRQnIP(P0_IRQn, P0_IQn_CFG); // 设置中断优先级
+  21   1          __EnableIRQ(P0_IRQn);             // 使能P1中断
+  22   1          IE_EA = 1;                        // 使能总开关
+  23   1      
+  24   1          P0_MD0 &= ~GPIO_P02_MODE_SEL(0x3); // 输入模式
+  25   1          P0_PD |= GPIO_P02_PULL_PD(0x1);    // 配置为下拉
+  26   1          P0_IMK |= GPIO_P02_IRQ_MASK(0x1);  // 使能IO中断
+  27   1          P0_TRG0 &= ~GPIO_P02_TRG_SEL(0x3);
+  28   1          P0_TRG0 |= GPIO_P02_TRG_SEL(0x2); // 配置上升沿触发
+  29   1      }
+  30          
+  31          // 速度扫描函数
+  32          void speed_scan(void)
+  33          {
+  34   1          static u32 last_speed = 0;                  // 记录上一次采集到的速度
+  35   1      
+  36   1          static u8 speed_increases_cnt = 0; // 检测速度是否在增加的计数值
+  37   1          static u8 speed_decreases_cnt = 0; // 检测速度是否在减少的计数值
+  38   1      
+  39   1          u32 cur_speed = 0; // 记录当前采集到的速度
+  40   1      
+  41   1          if (tmr2_cnt >= 1000) // 如果经过了100ms
+  42   1          {
+  43   2              tmr2_cnt = 0; // 清除定时器计数
+  44   2              // 计算1000ms内走过了多少毫米
+  45   2              // 脉冲个数 / 一圈有多少个脉冲 * 一圈表示走过了多少mm == 该段时间内走�
+             -�的距离(单位:mm)
+  46   2              cur_speed = detect_speed_pulse_cnt * MM_PER_TURN / PULSE_PER_TURN;
+  47   2              distance += cur_speed; // 存放走过的距离，单位：毫米(因为没有使用浮点类型,�
+             -��要累加,否则后续统计里程时就会丢失数据)
+  48   2              // 计算得出1小时能走过多少毫米
+  49   2              // tmp = tmp * 4 * 3600;
+  50   2              cur_speed *= 14400;
+C51 COMPILER V9.60.7.0   SPEED_SCAN                                                        11/20/2024 15:06:13 PAGE 2   
+
+  51   2              cur_speed /= 1000000; // 换算成 km/h的单位
+  52   2              detect_speed_pulse_cnt = 0; // 清除脉冲计数
+  53   2      
+  54   2              if (cur_speed > last_speed)
+  55   2              {
+  56   3                  speed_decreases_cnt = 0;
+  57   3                  speed_increases_cnt++;
+  58   3      
+  59   3                  if (speed_increases_cnt >= 10)
+  60   3                  {
+  61   4                      last_speed = cur_speed;
+  62   4      
+  63   4                      fun_info.speed = cur_speed;
+  64   4                      flag_get_speed = 1;
+  65   4                  }
+  66   3              }
+  67   2              else if (cur_speed < last_speed)
+  68   2              {
+  69   3                  speed_increases_cnt = 0;
+  70   3                  speed_decreases_cnt++;
+  71   3                  if (speed_decreases_cnt >= 10)
+  72   3                  {
+  73   4                      last_speed = cur_speed;
+  74   4      
+  75   4                      fun_info.speed = cur_speed;
+  76   4                      flag_get_speed = 1;
+  77   4                  }
+  78   3              }
+  79   2              else
+  80   2              {
+  81   3                  // 如果速度未发生变化
+  82   3                  speed_increases_cnt = 0;
+  83   3                  speed_decreases_cnt = 0;
+  84   3              }
+  85   2          }
+  86   1      }
+  87          
+  88          // P0中断服务函数
+  89          void P0_IRQHandler(void) interrupt P0_IRQn
+  90          {
+  91   1          // Px_PND寄存器写任何值都会清标志位
+  92   1          u8 p0_pnd = P0_PND;
+  93   1      
+  94   1          // 进入中断设置IP，不可删除
+  95   1          __IRQnIPnPush(P0_IRQn);
+  96   1          // ---------------- 用户函数处理 -------------------
+  97   1          if (p0_pnd & GPIO_P02_IRQ_PNG(0x1))
+  98   1          {
+  99   2              detect_speed_pulse_cnt++;
+ 100   2          }
+ 101   1          P0_PND = p0_pnd; // 清P0中断标志位
+ 102   1          // -------------------------------------------------
+ 103   1          // 退出中断设置IP，不可删除
+ 104   1          __IRQnIPnPop(P0_IRQn);
+ 105   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    378    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     14       4
+   PDATA SIZE       =   ----    ----
+C51 COMPILER V9.60.7.0   SPEED_SCAN                                                        11/20/2024 15:06:13 PAGE 3   
+
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

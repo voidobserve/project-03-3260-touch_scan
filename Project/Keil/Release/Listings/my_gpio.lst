@@ -1,0 +1,14 @@
+C51 COMPILER V9.60.7.0   MY_GPIO                                                           11/20/2024 15:13:46 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MY_GPIO
+OBJECT MODULE PLACED IN .\Release\Objects\my_gpio.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\Hardware\my_gpio.c LARGE OPTIMIZE(8,SIZE) BROWSE INTVECTOR(0X000C)
+                    - INCDIR(..\..\Libraries\Include;..\..\User;..\..\User\lib;..\..\Hardware) INTERVAL(3) DEBUG OBJECTEXTEND PRINT(.\Release
+                    -\Listings\my_gpio.lst) OBJECT(.\Release\Objects\my_gpio.obj)
+
+line level    source
+
+*** ERROR C318 OF ..\..\Hardware\my_gpio.c: can't open file '..\..\Hardware\my_gpio.c'
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  1 ERROR(S)

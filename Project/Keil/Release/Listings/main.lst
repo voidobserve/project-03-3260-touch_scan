@@ -1,0 +1,100 @@
+C51 COMPILER V9.60.7.0   MAIN                                                              11/20/2024 17:46:08 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Release\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\..\User\main.c LARGE OPTIMIZE(8,SIZE) BROWSE INTVECTOR(0X000C) INCDIR
+                    -(..\..\Libraries\Include;..\..\User;..\..\User\lib;..\..\Hardware) INTERVAL(3) DEBUG OBJECTEXTEND PRINT(.\Release\Listin
+                    -gs\main.lst) OBJECT(.\Release\Objects\main.obj)
+
+line level    source
+
+   1          /**
+   2           ******************************************************************************
+   3           * @file    main.c
+   4           * @author  HUGE-IC Application Team
+   5           * @version V1.0.0
+   6           * @date    05-11-2022
+   7           * @brief   Main program body
+   8           ******************************************************************************
+   9           * @attention
+  10           *
+  11           * <h2><center>&copy; COPYRIGHT 2021 HUGE-IC</center></h2>
+  12           *
+  13           * 版权说明后续补上
+  14           *
+  15           ******************************************************************************
+  16           */
+  17          
+  18          /* Includes ------------------------------------------------------------------*/
+  19          #include "include.h"
+  20          
+  21          /** @addtogroup Template_Project
+  22           * @{
+  23           */
+  24          
+  25          
+  26          
+  27          void main(void)
+  28          {
+  29   1          // 看门狗默认打开, 复位时间2s
+  30   1          system_init();
+  31   1      
+  32   1          WDT_KEY = WDT_KEY_VAL(0xDD); //  关闭看门狗
+  33   1      
+  34   1          // 关闭HCK和HDA的调试功能
+  35   1          WDT_KEY = 0x55;  // 解除写保护
+  36   1          IO_MAP &= ~0x01; // 清除这个寄存器的值，实现关闭HCK和HDA引脚的调试功能（解除�
+             -��射）
+  37   1          WDT_KEY = 0xBB;
+  38   1      
+  39   1          /* 用户代码初始化接口 */
+  40   1          // user_init();
+  41   1          {                    // user_init();
+  42   2             
+  43   2              uart0_config();          // 发送和接收指令使用到的串口
+  44   2            
+  45   2          } // user_init();
+  46   1      
+  47   1      
+  48   1      
+  49   1      
+  50   1          /* 按键初始化 */
+  51   1          tk_param_init();
+  52   1      
+C51 COMPILER V9.60.7.0   MAIN                                                              11/20/2024 17:46:08 PAGE 2   
+
+  53   1          // P1_MD0 &= (~GPIO_P11_MODE_SEL(0x3));
+  54   1          // P1_MD0 |= GPIO_P11_MODE_SEL(0x1); // 输出模式
+  55   1          // FOUT_S11 |= GPIO_FOUT_AF_FUNC;
+  56   1      
+  57   1          /* 系统主循环 */
+  58   1          while (1)
+  59   1          {
+  60   2              /* 按键扫描函数 */
+  61   2              __tk_scan(); // 使用了库里面的接口（闭源库）
+  62   2      
+  63   2              /* 用户循环扫描函数接口 */
+  64   2              touch_key_scan();
+  65   2          }
+  66   1      }
+  67          
+  68          /**
+  69           * @}
+  70           */
+  71          
+  72          /*************************** (C) COPYRIGHT 2022 HUGE-IC ***** END OF FILE *****/
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     33    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
